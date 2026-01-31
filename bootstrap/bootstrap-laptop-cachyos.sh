@@ -44,7 +44,8 @@ pacman_install() {
 paru_install() {
     local pkgs=("$@")
     if ((${#pkgs[@]} > 0)); then
-        paru -S --needed --noconfirm "${pkgs[@]}"
+        # Run paru as the actual user (not root) with non-interactive flags
+        sudo -u "$SUDO_USER" PARU_PAGER=cat paru -S --needed --noconfirm --skipreview --useask "${pkgs[@]}"
     fi
 }
 
