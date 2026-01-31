@@ -186,7 +186,7 @@ main() {
 
     echo ""
     echo "==> Installing AUR packages (paru)"
-    paru_install microsoft-edge-stable-bin google-chrome balena-etcher-bin onedrive-abraunegg
+    paru_install microsoft-edge-stable-bin google-chrome impression onedrive-abraunegg
 
     echo ""
     echo "==> Configuring Snapper for root filesystem"
