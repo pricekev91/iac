@@ -1,11 +1,80 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+#Version .001 next commit increment by .001
+
 #############################################
-# CachyOS Bootstrap Script
-# Non-interactive, idempotent system setup
-# Requirements: root, paru, Btrfs root
+# CachyOS Gold Standard Image Bootstrap Script
+#
+# One‑liner to run this script directly:
+#   curl -fsSL https://raw.githubusercontent.com/pricekev91/iac/refs/heads/main/bootstrap/bootstrap-laptop-cachyos.sh | sudo bash
+#
+# This script performs a polished, automated setup
+# for a personal laptop using a “corporate‑grade”
+# baseline image style.
+#
+# ─────────────────────────────────────────────
+# SOFTWARE REMOVED
+# ─────────────────────────────────────────────
+# • cachyos-snapper-support
+#     - Removed to avoid conflicts with Timeshift
+#
+# • firefox
+#     - Removed in favor of preferred browsers
+#
+# ─────────────────────────────────────────────
+# SOFTWARE INSTALLED (PACMAN)
+# ─────────────────────────────────────────────
+# • timeshift
+#     - Primary snapshot/restore tool (Btrfs mode)
+#
+# • steam
+# • libreoffice-fresh
+# • grub-btrfs
+#
+# ─────────────────────────────────────────────
+# SOFTWARE INSTALLED (AUR VIA PARU)
+# ─────────────────────────────────────────────
+# • microsoft-edge-stable-bin
+# • google-chrome
+# • impression
+# • onedrive-abraunegg
+# • mission-center
+#
+# ─────────────────────────────────────────────
+# SYSTEM CONFIGURATION
+# ─────────────────────────────────────────────
+# • Timeshift initialized in Btrfs mode
+# • Initial + final Timeshift snapshots created
+# • GRUB-Btrfs integration enabled
+# • OneDrive configured + systemd user service enabled
+# • Linger enabled for background sync
+#
+# ─────────────────────────────────────────────
+# FINALIZATION
+# ─────────────────────────────────────────────
+# • Full log stored in /var/log/bootstrap-cachyos.log
+# • Automatic reboot after 60 seconds
+#
 #############################################
+
+# ANSI Colors
+RED="\e[31m"
+GREEN="\e[32m"
+YELLOW="\e[33m"
+BLUE="\e[34m"
+MAGENTA="\e[35m"
+CYAN="\e[36m"
+RESET="\e[0m"
+
+banner() {
+    local msg="$1"
+    echo -e "${CYAN}"
+    echo "╔════════════════════════════════════════════════════════════╗"
+    printf "║ %-58s ║\n" "$msg"
+    echo "╚════════════════════════════════════════════════════════════╝"
+    echo -e "${RESET}"
+}
 
 # Enable logging to file
 exec > >(tee -a /var/log/bootstrap-cachyos.log)
@@ -17,14 +86,14 @@ exec 2>&1
 
 require_root() {
     if [[ "$(id -u)" -ne 0 ]]; then
-        echo "ERROR: This script must be run as root (use sudo)." >&2
+        echo -e "${RED}ERROR: This script must be run as root (use sudo).${RESET}" >&2
         exit 1
     fi
 }
 
 check_paru() {
     if ! command -v paru >/dev/null 2>&1; then
-        echo "ERROR: paru is not installed but is required for AUR packages." >&2
+        echo -e "${RED}ERROR: paru is not installed but is required for AUR packages.${RESET}" >&2
         echo "Install paru first, then re-run this script." >&2
         exit 1
     fi
@@ -44,7 +113,6 @@ pacman_install() {
 paru_install() {
     local pkgs=("$@")
     if ((${#pkgs[@]} > 0)); then
-        # Run paru as the actual user (not root) with non-interactive flags
         sudo -u "$SUDO_USER" PARU_PAGER=cat paru -S --needed --noconfirm --skipreview --useask "${pkgs[@]}"
     fi
 }
@@ -56,7 +124,7 @@ package_installed() {
 remove_package_if_installed() {
     local pkg="$1"
     if package_installed "$pkg"; then
-        echo "Removing $pkg and its dependencies..."
+        echo -e "${YELLOW}Removing $pkg and its dependencies...${RESET}"
         pacman -Rns --noconfirm "$pkg"
     else
         echo "$pkg not installed, skipping removal."
@@ -68,21 +136,21 @@ remove_package_if_installed() {
 #-----------------------------
 
 setup_timeshift() {
-    echo "Configuring Timeshift for Btrfs snapshots..."
+    echo -e "${BLUE}Configuring Timeshift for Btrfs snapshots...${RESET}"
     
-    # Timeshift will auto-detect Btrfs on first run
-    # Create initial configuration if it doesn't exist
     if [[ ! -f /etc/timeshift/timeshift.json ]]; then
         echo "Running Timeshift initial setup..."
-        # This creates the default config for Btrfs
-        timeshift --btrfs --snapshot-device /dev/$(findmnt -n -o SOURCE / | sed 's/\[.*\]//') --yes || true
+        timeshift --btrfs --snapshot-device /dev/$(findmnt -n -o SOURCE / | sed 's/
+
+\[.*\]
+
+//') --yes || true
     fi
 }
 
 create_timeshift_snapshot() {
     local description="$1"
-    
-    echo "Creating Timeshift snapshot: '$description'"
+    echo -e "${GREEN}Creating Timeshift snapshot: '$description'${RESET}"
     timeshift --create --comments "$description" --tags O
 }
 
@@ -91,7 +159,6 @@ create_timeshift_snapshot() {
 #-----------------------------
 
 enable_grub_btrfs() {
-    # Enable automatic GRUB menu updates when snapshots change
     systemctl enable --now grub-btrfs.path || true
     echo "grub-btrfs.path enabled for automatic snapshot boot entries."
 }
@@ -101,54 +168,38 @@ enable_grub_btrfs() {
 #-----------------------------
 
 setup_onedrive() {
-    # Configure OneDrive for the actual user (not root)
     local real_user="${SUDO_USER:-}"
     if [[ -z "$real_user" || "$real_user" == "root" ]]; then
-        echo "WARNING: Could not determine non-root user for OneDrive."
-        echo "Manual setup required - see OneDrive documentation."
+        echo -e "${YELLOW}WARNING: Could not determine non-root user for OneDrive.${RESET}"
+        echo "Manual setup required."
         return 0
     fi
 
     local user_home
     user_home="$(eval echo "~${real_user}")"
 
-    # Create OneDrive config directory
     sudo -u "$real_user" mkdir -p "${user_home}/.config/onedrive"
 
-    # Generate default config if it doesn't exist
     local config_file="${user_home}/.config/onedrive/config"
     if [[ ! -f "$config_file" ]]; then
         cat <<EOF | sudo -u "$real_user" tee "$config_file" >/dev/null
-# OneDrive configuration (abraunegg client)
-# Generated by bootstrap-cachyos.sh
-
 sync_dir = "${user_home}/OneDrive"
 skip_symlinks = "true"
 monitor_interval = "300"
 EOF
     fi
 
-    # Enable user services to run without active login
     loginctl enable-linger "$real_user" || true
-
-    # Enable OneDrive systemd user service
     sudo -u "$real_user" systemctl --user enable --now onedrive.service || true
 
     cat <<'EOF'
 
-╔════════════════════════════════════════════════════════════╗
-║          OneDrive Manual Authentication Required           ║
-╚════════════════════════════════════════════════════════════╝
-
-Log in as your regular user and complete these steps ONCE:
-
+OneDrive authentication required:
 1. Run: onedrive
-2. Open the URL shown in your browser
-3. Sign in to Microsoft and authorize the app
-4. Paste the response URL back into the terminal
-5. Restart the service: systemctl --user restart onedrive.service
-
-OneDrive will then sync automatically via systemd.
+2. Open the URL shown
+3. Sign in
+4. Paste the response URL
+5. Restart: systemctl --user restart onedrive.service
 
 EOF
 }
@@ -161,50 +212,49 @@ main() {
     require_root
     check_paru
 
-    echo "╔════════════════════════════════════════════════════════════╗"
-    echo "║          CachyOS Bootstrap - Corporate Image Setup         ║"
-    echo "╚════════════════════════════════════════════════════════════╝"
-    echo "Log: /var/log/bootstrap-cachyos.log"
+    banner "CachyOS Gold Standard Image Bootstrap Script"
+    echo -e "${YELLOW}Log: /var/log/bootstrap-cachyos.log${RESET}"
+    echo ""
+
+    echo "==> Removing cachyos-snapper-support"
+    remove_package_if_installed cachyos-snapper-support
     echo ""
 
     echo "==> Installing base packages (pacman)"
     pacman_install timeshift steam libreoffice-fresh grub-btrfs
-
     echo ""
+
     echo "==> Installing AUR packages (paru)"
     paru_install microsoft-edge-stable-bin google-chrome impression onedrive-abraunegg mission-center
-
     echo ""
-    echo "==> Configuring Timeshift for Btrfs snapshots"
+
+    echo "==> Configuring Timeshift"
     setup_timeshift
-
     echo ""
+
     echo "==> Creating initial Timeshift snapshot"
-    create_timeshift_snapshot "Fresh install"
-
+    create_timeshift_snapshot "CachyOS Gold Standard Image – Fresh Install"
     echo ""
+
     echo "==> Removing Firefox"
     remove_package_if_installed firefox
-
     echo ""
+
     echo "==> Enabling GRUB snapshot integration"
     enable_grub_btrfs
-
     echo ""
-    echo "==> Configuring OneDrive sync"
+
+    echo "==> Configuring OneDrive"
     setup_onedrive
-
     echo ""
+
     echo "==> Creating final Timeshift snapshot"
-    create_timeshift_snapshot "Initial CachyOS configuration completed"
+    create_timeshift_snapshot "CachyOS Gold Standard Image – Finalized"
+    echo ""
 
-    echo ""
-    echo "╔════════════════════════════════════════════════════════════╗"
-    echo "║                    Bootstrap Complete!                     ║"
-    echo "╚════════════════════════════════════════════════════════════╝"
-    echo ""
+    banner "Bootstrap Complete!"
     echo "System will reboot in 60 seconds."
-    echo "Press Ctrl+C to cancel and review logs."
+    echo "Press Ctrl+C to cancel."
     echo ""
 
     for i in {60..1}; do
