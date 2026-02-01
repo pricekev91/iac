@@ -64,40 +64,26 @@ remove_package_if_installed() {
 }
 
 #-----------------------------
-# Snapper Configuration
+# Timeshift Configuration
 #-----------------------------
 
-ensure_snapper_root_config() {
-    # Create snapper config for root filesystem if it doesn't exist
-    if [[ ! -f /etc/snapper/configs/root ]]; then
-        echo "Creating snapper config 'root' for / ..."
-        snapper -c root create-config /
-    else
-        echo "Snapper config 'root' already exists."
+setup_timeshift() {
+    echo "Configuring Timeshift for Btrfs snapshots..."
+    
+    # Timeshift will auto-detect Btrfs on first run
+    # Create initial configuration if it doesn't exist
+    if [[ ! -f /etc/timeshift/timeshift.json ]]; then
+        echo "Running Timeshift initial setup..."
+        # This creates the default config for Btrfs
+        timeshift --btrfs --snapshot-device /dev/$(findmnt -n -o SOURCE / | sed 's/\[.*\]//') --yes || true
     fi
-
-    # Enable automatic timeline and cleanup
-    systemctl enable --now snapper-timeline.timer snapper-cleanup.timer || true
 }
 
-snapshot_exists_by_description() {
-    local desc="$1"
-    # Exact match on description column to avoid partial matches
-    snapper -c root list --columns description | grep -Fxq "$desc"
-}
-
-create_protected_snapshot_if_missing() {
-    local desc="$1"
-
-    if snapshot_exists_by_description "$desc"; then
-        echo "Snapshot '$desc' already exists, skipping."
-    else
-        echo "Creating protected snapshot: '$desc'"
-        snapper -c root create \
-            --description "$desc" \
-            --cleanup-algorithm important \
-            --userdata "important=yes"
-    fi
+create_timeshift_snapshot() {
+    local description="$1"
+    
+    echo "Creating Timeshift snapshot: '$description'"
+    timeshift --create --comments "$description" --tags O
 }
 
 #-----------------------------
@@ -182,19 +168,19 @@ main() {
     echo ""
 
     echo "==> Installing base packages (pacman)"
-    pacman_install snapper steam libreoffice-fresh grub-btrfs mc
+    pacman_install timeshift steam libreoffice-fresh grub-btrfs
 
     echo ""
     echo "==> Installing AUR packages (paru)"
-    paru_install microsoft-edge-stable-bin google-chrome impression onedrive-abraunegg
+    paru_install microsoft-edge-stable-bin google-chrome impression onedrive-abraunegg mission-center
 
     echo ""
-    echo "==> Configuring Snapper for root filesystem"
-    ensure_snapper_root_config
+    echo "==> Configuring Timeshift for Btrfs snapshots"
+    setup_timeshift
 
     echo ""
-    echo "==> Creating initial protected snapshot"
-    create_protected_snapshot_if_missing "Base CachyOS install+snapper - important keep forever!"
+    echo "==> Creating initial Timeshift snapshot"
+    create_timeshift_snapshot "Fresh install"
 
     echo ""
     echo "==> Removing Firefox"
@@ -209,8 +195,8 @@ main() {
     setup_onedrive
 
     echo ""
-    echo "==> Creating final protected snapshot"
-    create_protected_snapshot_if_missing "Base CachyOS Complete - Let the chaos begin!"
+    echo "==> Creating final Timeshift snapshot"
+    create_timeshift_snapshot "Initial CachyOS configuration completed"
 
     echo ""
     echo "╔════════════════════════════════════════════════════════════╗"
