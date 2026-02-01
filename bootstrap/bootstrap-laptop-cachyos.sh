@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-#Version .001 next commit increment by .001
+#Version .002 next commit increment by .001
 
 #############################################
 # CachyOS Gold Standard Image Bootstrap Script
@@ -16,9 +16,6 @@ set -euo pipefail
 # ─────────────────────────────────────────────
 # SOFTWARE REMOVED
 # ─────────────────────────────────────────────
-# • cachyos-snapper-support
-#     - Removed to avoid conflicts with Timeshift
-#
 # • firefox
 #     - Removed in favor of preferred browsers
 #
@@ -30,7 +27,6 @@ set -euo pipefail
 #
 # • steam
 # • libreoffice-fresh
-# • grub-btrfs
 #
 # ─────────────────────────────────────────────
 # SOFTWARE INSTALLED (AUR VIA PARU)
@@ -46,7 +42,7 @@ set -euo pipefail
 # ─────────────────────────────────────────────
 # • Timeshift initialized in Btrfs mode
 # • Initial + final Timeshift snapshots created
-# • GRUB-Btrfs integration enabled
+# • GRUB snapshot integration preserved (CachyOS default)
 # • OneDrive configured + systemd user service enabled
 # • Linger enabled for background sync
 #
@@ -137,14 +133,14 @@ remove_package_if_installed() {
 
 setup_timeshift() {
     echo -e "${BLUE}Configuring Timeshift for Btrfs snapshots...${RESET}"
-    
+
     if [[ ! -f /etc/timeshift/timeshift.json ]]; then
         echo "Running Timeshift initial setup..."
-        timeshift --btrfs --snapshot-device /dev/$(findmnt -n -o SOURCE / | sed 's/
+        timeshift --btrfs --snapshot-device /dev/"$(findmnt -n -o SOURCE / | sed 's/
 
 \[.*\]
 
-//') --yes || true
+//')" --yes || true
     fi
 }
 
@@ -152,15 +148,6 @@ create_timeshift_snapshot() {
     local description="$1"
     echo -e "${GREEN}Creating Timeshift snapshot: '$description'${RESET}"
     timeshift --create --comments "$description" --tags O
-}
-
-#-----------------------------
-# GRUB Integration
-#-----------------------------
-
-enable_grub_btrfs() {
-    systemctl enable --now grub-btrfs.path || true
-    echo "grub-btrfs.path enabled for automatic snapshot boot entries."
 }
 
 #-----------------------------
@@ -216,12 +203,20 @@ main() {
     echo -e "${YELLOW}Log: /var/log/bootstrap-cachyos.log${RESET}"
     echo ""
 
-    echo "==> Removing cachyos-snapper-support"
-    remove_package_if_installed cachyos-snapper-support
+    echo "==> Snapshot stack detection"
+    if pacman -Qi grub-btrfs-support >/dev/null 2>&1; then
+        echo "CachyOS snapshot stack detected (grub-btrfs-support present)."
+        echo "Skipping removal of cachyos-snapper-support to avoid breaking GRUB integration."
+    else
+        echo "Non-CachyOS snapshot stack detected."
+        echo "Safe to remove cachyos-snapper-support."
+        remove_package_if_installed cachyos-snapper-support
+    fi
     echo ""
 
     echo "==> Installing base packages (pacman)"
-    pacman_install timeshift steam libreoffice-fresh grub-btrfs
+    # grub-btrfs NOT installed — CachyOS already provides grub-btrfs-support
+    pacman_install timeshift steam libreoffice-fresh
     echo ""
 
     echo "==> Installing AUR packages (paru)"
@@ -240,8 +235,8 @@ main() {
     remove_package_if_installed firefox
     echo ""
 
-    echo "==> Enabling GRUB snapshot integration"
-    enable_grub_btrfs
+    echo "==> GRUB snapshot integration"
+    echo "CachyOS handles GRUB snapshot integration automatically via grub-btrfs-support."
     echo ""
 
     echo "==> Configuring OneDrive"
