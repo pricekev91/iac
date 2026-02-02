@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-#Version .003 next commit increment by .001
+#Version .005 next commit increment by .001
 
 #############################################
 # CachyOS Gold Standard Image Bootstrap Script
@@ -24,13 +24,6 @@ set -euo pipefail
 #     - timeshift (Btrfs mode)
 #     - grub-btrfs (upstream)
 #
-# Rationale:
-# • Timeshift and cachyos-snapper-support conflict.
-# • grub-btrfs-support requires cachyos-snapper-support.
-# • To use Timeshift + GRUB snapshot boot entries,
-#   we must remove the CachyOS Snapper stack and
-#   install upstream grub-btrfs.
-#
 # ─────────────────────────────────────────────
 # SOFTWARE REMOVED
 # ─────────────────────────────────────────────
@@ -42,11 +35,7 @@ set -euo pipefail
 # SOFTWARE INSTALLED (PACMAN)
 # ─────────────────────────────────────────────
 # • timeshift
-#     - Primary snapshot/restore tool (Btrfs mode)
-#
 # • grub-btrfs
-#     - GRUB integration for Btrfs snapshots
-#
 # • steam
 # • libreoffice-fresh
 #
@@ -57,14 +46,17 @@ set -euo pipefail
 # • google-chrome
 # • impression
 # • onedrive-abraunegg
+# • onedrivegui
 # • mission-center
+# • obsidian
+# • yazi
 #
 # ─────────────────────────────────────────────
 # SYSTEM CONFIGURATION
 # ─────────────────────────────────────────────
 # • Timeshift initialized in Btrfs mode
 # • Initial + final Timeshift snapshots created
-# • grub-btrfs.path enabled for snapshot boot entries
+# • grub-btrfs.path enabled
 # • OneDrive configured + systemd user service enabled
 # • Linger enabled for background sync
 #
@@ -236,7 +228,6 @@ main() {
     echo ""
 
     echo "==> Snapshot stack migration (CachyOS → Timeshift)"
-    echo "Removing CachyOS Snapper-based snapshot stack to allow Timeshift + grub-btrfs."
     remove_package_if_installed grub-btrfs-support
     remove_package_if_installed cachyos-snapper-support
     echo ""
@@ -246,7 +237,7 @@ main() {
     echo ""
 
     echo "==> Installing AUR packages (paru)"
-    paru_install microsoft-edge-stable-bin google-chrome impression onedrive-abraunegg mission-center
+    paru_install microsoft-edge-stable-bin google-chrome impression onedrive-abraunegg onedrivegui mission-center obsidian yazi
     echo ""
 
     echo "==> Configuring Timeshift"
