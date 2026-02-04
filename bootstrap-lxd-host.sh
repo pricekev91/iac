@@ -1,11 +1,29 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# -----------------------------------------------------------------------------
-# Phase 1 — LXD Host Bootstrap
-# Target OS: Arch / CachyOS
-# Purpose: Prepare host for LXD-based IaC
-# -----------------------------------------------------------------------------
+###############################################################################
+# Phase 1 — LXD Host Bootstrap (Arch / CachyOS)
+#
+# One‑liner install:
+#   curl -fsSL https://raw.githubusercontent.com/pricekev91/iac/main/bootstrap-lxd-host.sh | sudo bash
+#
+# What this does:
+#   - Installs LXD and its required runtime components
+#   - Enables LXD and lxcfs services
+#   - Initializes LXD with a deterministic preseed:
+#       * Btrfs storage pool named "default"
+#       * NAT bridge "lxdbr0" with IPv4
+#   - Prepares the host for Phase 2 Infrastructure‑as‑Code
+#
+# What this intentionally does NOT do:
+#   - No GPU passthrough
+#   - No containers
+#   - No profiles beyond default
+#   - No AI tooling
+#
+# This script is safe to re‑run and is designed to be portable across
+# laptop and homelab hosts.
+###############################################################################
 
 log() {
   printf "\n[+] %s\n" "$1"
@@ -25,8 +43,7 @@ install_packages() {
     lxd \
     lxc \
     lxcfs \
-    dnsmasq \
-    bridge-utils
+    dnsmasq
 }
 
 enable_services() {
